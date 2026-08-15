@@ -3,6 +3,12 @@
 venv/
 env/
 
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+
 # Python cache & bytecode
 __pycache__/
 *.py[cod]
@@ -13,8 +19,10 @@ __pycache__/
 # Data files (raw and processed data)
 data/processed/
 data/raw/
+data/embeddings/
 *.parquet
 *.jsonl
+
 
 # Testing & Coverage
 .pytest_cache/
