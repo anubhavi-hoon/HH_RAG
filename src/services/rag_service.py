@@ -111,6 +111,15 @@ class RAGService(ABC):
 @lru_cache(maxsize=1)
 def get_rag_service() -> RAGService:
     """Provide the active implementation. Routes inject this via ``Depends``."""
-    from src.services.mock_rag import MockRAGService
+    import os
 
+    use_real = os.getenv("HH_RAG_USE_REAL", "false").lower() in ("1", "true", "yes")
+    use_mock = os.getenv("HH_RAG_USE_MOCK", "true" if not use_real else "false").lower() in ("1", "true", "yes")
+
+    if not use_mock or use_real:
+        from src.services.real_rag import RealRAGService
+        return RealRAGService()
+
+    from src.services.mock_rag import MockRAGService
     return MockRAGService()
+
