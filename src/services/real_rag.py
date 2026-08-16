@@ -15,12 +15,14 @@ from src.api.schemas.rag import LatencyMetrics, RagResponse, Source
 from src.config import DEFAULT_LANGUAGE, Language
 from src.orchestration.harness import RAGHarness, get_harness
 from src.orchestration.schemas import QueryRequest, ResponseStatus
-from src.services.mock_rag import transcribe_audio
 from src.services.rag_service import (
     AudioInput,
+    AudioInvalidError,
     InvalidQueryError,
     RAGService,
+    SttFailedError,
 )
+from src.services.sarvam_stt import SarvamSTTService
 
 logger = logging.getLogger("real_rag_service")
 
@@ -37,11 +39,16 @@ class RealRAGService(RAGService):
     Production RAG Service connecting FastAPI to the Stage 5 RAG Harness.
     """
 
-    def __init__(self, harness: Optional[RAGHarness] = None):
+    def __init__(
+        self,
+        harness: Optional[RAGHarness] = None,
+        stt_service: Optional[SarvamSTTService] = None,
+    ):
         """
         Initializes the service with dependency injection for clean testing.
         """
         self.harness = harness if harness is not None else get_harness()
+        self.stt_service = stt_service if stt_service is not None else SarvamSTTService()
 
     def query(self, query: str) -> RagResponse:
         """
@@ -102,9 +109,23 @@ class RealRAGService(RAGService):
 
     def voice(self, audio: AudioInput) -> RagResponse:
         """
-        Transcribes audio input and answers the transcribed question.
+        Transcribes audio input via Sarvam STT and answers the transcribed question.
         """
-        transcript = transcribe_audio(audio.filename, audio.data)
+        if audio is None or not audio.data:
+            raise AudioInvalidError("Uploaded audio file is empty.")
+
+        stt_result = self.stt_service.transcribe(
+            filename=audio.filename,
+            content_type=audio.content_type,
+            audio_bytes=audio.data,
+        )
+
+        transcript = (stt_result.transcript or "").strip()
+        if not transcript:
+            raise SttFailedError("Speech-to-text produced an empty transcript.")
+
         response = self.query(transcript)
         response.transcript = transcript
+        response.latency.stt_ms = round(stt_result.latency_ms, 3)
         return response
+
