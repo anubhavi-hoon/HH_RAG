@@ -29,7 +29,16 @@ data/embeddings/
 .coverage
 htmlcov/
 
+# Generated benchmark runs (keep the directory, not the results)
+evaluation/results/*
+!evaluation/results/.gitkeep
+
 # IDE & OS
 .DS_Store
 .vscode/
 .idea/
+
+# Local secrets / configuration
+.env
+.env.local
+!.env.example
