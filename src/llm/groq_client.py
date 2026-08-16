@@ -64,16 +64,27 @@ def format_context_chunks(retrieved_chunks: List[Dict[str, Any]]) -> str:
     return "\n\n".join(context_blocks)
 
 
+_GROQ_CLIENT: Optional[groq.Groq] = None
+_CACHED_API_KEY: Optional[str] = None
+
+
 def get_groq_client(api_key: Optional[str] = None) -> groq.Groq:
     """
-    Initializes and returns a Groq client instance.
+    Initializes and returns a cached persistent Groq client instance (singleton).
+    Reuses existing HTTP connection pool across requests.
     """
+    global _GROQ_CLIENT, _CACHED_API_KEY
     key = api_key or os.environ.get("GROQ_API_KEY")
     if not key or not key.strip():
         raise ValueError(
             "GROQ_API_KEY is not set. Please set the GROQ_API_KEY environment variable or configure it in a .env file."
         )
-    return groq.Groq(api_key=key.strip())
+    clean_key = key.strip()
+    if _GROQ_CLIENT is None or _CACHED_API_KEY != clean_key:
+        _GROQ_CLIENT = groq.Groq(api_key=clean_key)
+        _CACHED_API_KEY = clean_key
+    return _GROQ_CLIENT
+
 
 
 def generate_answer(
