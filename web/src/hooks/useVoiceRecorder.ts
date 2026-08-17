@@ -52,14 +52,26 @@ interface RecorderOptions {
 
 export function useVoiceRecorder({ onComplete, onError }: RecorderOptions) {
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
 
-  const releaseStream = useCallback(() => {
-    recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
+  const cleanup = useCallback(() => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      try {
+        recorderRef.current.stop();
+      } catch {
+        // Ignore stop errors during cleanup
+      }
+    }
     recorderRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    chunksRef.current = [];
   }, []);
 
-  useEffect(() => releaseStream, [releaseStream]);
+  useEffect(() => cleanup, [cleanup]);
 
   const start = useCallback(async (): Promise<boolean> => {
     if (!isRecordingSupported()) {
@@ -67,9 +79,13 @@ export function useVoiceRecorder({ onComplete, onError }: RecorderOptions) {
       return false;
     }
 
+    // Ensure any previous recorder or stream is cleaned up
+    cleanup();
+
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
     } catch (error) {
       onError(microphoneErrorMessage(error));
       return false;
@@ -80,40 +96,60 @@ export function useVoiceRecorder({ onComplete, onError }: RecorderOptions) {
     try {
       recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     } catch {
-      stream.getTracks().forEach((track) => track.stop());
+      cleanup();
       onError("This browser could not record audio in a supported format.");
       return false;
     }
 
+    // Fresh chunk array for this recording session
     chunksRef.current = [];
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunksRef.current.push(event.data);
+
+    recorder.ondataavailable = (event: BlobEvent) => {
+      if (event.data && event.data.size > 0) {
+        chunksRef.current.push(event.data);
+      }
     };
+
     recorder.onerror = () => {
-      releaseStream();
+      cleanup();
       onError("Recording stopped unexpectedly.");
     };
+
     recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, {
-        type: recorder.mimeType || mimeType || "audio/webm",
-      });
+      const currentChunks = [...chunksRef.current];
       chunksRef.current = [];
-      releaseStream();
+
+      const activeMime = recorder.mimeType || mimeType || "audio/webm";
+      const blob = new Blob(currentChunks, { type: activeMime });
+
+      // Stop audio tracks after recording completion
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      recorderRef.current = null;
+
+      console.info(
+        `[VoiceRecorder] Finalized recording | Chunks: ${currentChunks.length} | Size: ${blob.size} bytes | MIME: ${activeMime}`
+      );
+
       if (blob.size === 0) {
         onError("No audio was captured. Check your microphone and try again.");
         return;
       }
+
       onComplete(blob);
     };
 
     recorderRef.current = recorder;
-    recorder.start();
+    // Collect chunks every 250ms for reliable audio stream capture
+    recorder.start(250);
     return true;
-  }, [onComplete, onError, releaseStream]);
+  }, [cleanup, onComplete, onError]);
 
   const stop = useCallback(() => {
     const recorder = recorderRef.current;
-    if (recorder && recorder.state !== "inactive") {
+    if (recorder && recorder.state === "recording") {
       recorder.stop();
     }
   }, []);

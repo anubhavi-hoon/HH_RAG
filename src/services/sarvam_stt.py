@@ -108,7 +108,10 @@ class SarvamSTTService:
         client = self._get_client()
 
         safe_filename = filename or "recording.webm"
-        safe_content_type = content_type or "audio/webm"
+        if "." not in safe_filename:
+            safe_filename = f"{safe_filename}.webm"
+
+        safe_content_type = (content_type or "audio/webm").split(";")[0].strip()
 
         # Prepare multipart file tuple
         file_payload = (safe_filename, audio_bytes, safe_content_type)

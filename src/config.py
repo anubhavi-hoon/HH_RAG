@@ -8,6 +8,10 @@ import os
 from enum import Enum
 from typing import List, Tuple
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 SERVICE_NAME = "hh-rag"
 SERVICE_VERSION = "0.1.0"
 

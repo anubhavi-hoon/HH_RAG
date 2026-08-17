@@ -7,6 +7,10 @@ from fastapi.testclient import TestClient
 
 from src.api.main import app
 from src.config import SERVICE_NAME, SERVICE_VERSION, SUPPORTED_LANGUAGES
+from src.services.mock_rag import MockRAGService
+from src.services.rag_service import get_rag_service
+
+app.dependency_overrides[get_rag_service] = lambda: MockRAGService()
 
 client = TestClient(app)
 

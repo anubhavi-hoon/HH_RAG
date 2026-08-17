@@ -96,6 +96,23 @@ class RealRAGService(RAGService):
             total_ms=0.0,  # Populated by route Timer
         )
 
+        # Extract sources from harness metadata
+        api_sources = []
+        if is_grounded:
+            raw_sources = meta.get("sources", [])
+            for s in raw_sources:
+                s_meta = s.get("metadata") or {}
+                api_sources.append(
+                    Source(
+                        chunk_id=str(s.get("chunk_id", "")),
+                        text=str(s.get("text", "")),
+                        score=float(s.get("score", 0.0)),
+                        language=s_meta.get("language", DEFAULT_LANGUAGE),
+                        strategy=s_meta.get("strategy"),
+                        doc_id=s_meta.get("doc_id"),
+                    )
+                )
+
         return RagResponse(
             transcript=None,
             query=clean_query,
@@ -103,7 +120,7 @@ class RealRAGService(RAGService):
             answer=final_response.answer,
             grounded=is_grounded,
             confidence=confidence,
-            sources=[],  # Full chunk exposure is a future API enhancement
+            sources=api_sources,
             latency=latency_metrics,
         )
 

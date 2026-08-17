@@ -36,14 +36,12 @@ logger = logging.getLogger("groq_client")
 
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"
 
-SYSTEM_PROMPT = """You are a grounded RAG assistant.
-Use the provided retrieved context to answer the user's question accurately and concisely.
-Prefer the retrieved context over unsupported outside knowledge.
-Do not invent facts or extrapolate beyond what the context supports.
-If the context does not contain enough information to answer the question, clearly state that the available context is insufficient.
-Respond in the same language as the user's question when possible.
-Do not mention prompt formatting or internal implementation details.
-Do not fabricate citations."""
+SYSTEM_PROMPT = """You are a strict RAG assistant.
+You MUST extract the answer ONLY from the provided CONTEXT.
+Do NOT use your pre-trained knowledge. Do NOT add external facts (like 'light', 'water', 'carbon dioxide' unless explicitly in the text).
+If the CONTEXT does not directly answer the question, state that the context is insufficient.
+Be highly concise and strictly grounded in the provided text.
+Respond in the same language as the user's question when possible."""
 
 
 def format_context_chunks(retrieved_chunks: List[Dict[str, Any]]) -> str:
@@ -141,9 +139,10 @@ def generate_answer(
         "model": effective_model,
         "messages": messages,
         "temperature": 0.0,
+        "include_reasoning": False,
     }
     if max_tokens is not None:
-        call_kwargs["max_tokens"] = max_tokens
+        call_kwargs["max_completion_tokens"] = max_tokens
 
     try:
         response = groq_client.chat.completions.create(**call_kwargs)

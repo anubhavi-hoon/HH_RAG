@@ -49,7 +49,7 @@ class RAGHarness:
         grounding_fn: Optional[Callable[..., GroundingResult]] = None,
         top_k: int = 3,
         default_model: Optional[str] = None,
-        max_tokens: int = 35,
+        max_tokens: int = 1024,
         min_similarity_threshold: float = DEFAULT_SIMILARITY_THRESHOLD,
     ):
         """
@@ -313,6 +313,7 @@ class RAGHarness:
                 "model": llm_response.model,
                 "grounding_reason": grounding_res.reason,
                 "grounding_overlap": grounding_res.overlap_score,
+                "sources": [c.to_dict() for c in retrieved_chunks],
             },
         )
 
