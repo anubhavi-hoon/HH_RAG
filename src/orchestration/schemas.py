@@ -27,6 +27,7 @@ class QueryRequest:
     query: str
     language: Optional[str] = None
     request_id: Optional[str] = None
+    require_grounding: bool = False
 
     def __post_init__(self):
         if not isinstance(self.query, str):
@@ -45,6 +46,7 @@ class QueryRequest:
             query=data["query"],
             language=data.get("language"),
             request_id=data.get("request_id"),
+            require_grounding=data.get("require_grounding", False),
         )
 
 

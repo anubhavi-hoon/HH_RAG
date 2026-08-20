@@ -50,7 +50,7 @@ class RealRAGService(RAGService):
         self.harness = harness if harness is not None else get_harness()
         self.stt_service = stt_service if stt_service is not None else SarvamSTTService()
 
-    def query(self, query: str) -> RagResponse:
+    def query(self, query: str, require_grounding: bool = False) -> RagResponse:
         """
         Executes a text query through the Stage 5 RAG Harness.
         """
@@ -71,13 +71,15 @@ class RealRAGService(RAGService):
             query=clean_query,
             language=lang_str,
             request_id=req_id,
+            require_grounding=require_grounding,
         )
 
         # 2. Execute through RAG Harness (Single entrypoint to RAG pipeline)
         final_response = self.harness.run(query_request)
 
         # 3. Map FinalResponse to API RagResponse schema
-        is_grounded = (final_response.status == ResponseStatus.SUCCESS)
+        meta = final_response.metadata or {}
+        is_grounded = meta.get("grounded", final_response.status == ResponseStatus.SUCCESS)
 
         # Deterministic confidence mapping
         if is_grounded:
@@ -145,4 +147,3 @@ class RealRAGService(RAGService):
         response.transcript = transcript
         response.latency.stt_ms = round(stt_result.latency_ms, 3)
         return response
-

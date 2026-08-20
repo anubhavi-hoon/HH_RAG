@@ -178,19 +178,100 @@ class RAGHarness:
         is_sufficient, ctx_reason, ctx_msg = context_sufficiency_guardrail(
             retrieved_chunks, min_similarity_threshold=self.min_similarity_threshold
         )
+
+        # General-knowledge fallback: when context is insufficient, generate an
+        # answer using the LLM's internal knowledge instead of refusing outright.
         if not is_sufficient:
+            if request.require_grounding:
+                # If explicit grounding is required, preserve the refusal
+                t_total_end = time.perf_counter()
+                total_latency_ms = (t_total_end - t_start) * 1000.0
+                return FinalResponse(
+                    answer=ctx_msg or "Available context is insufficient.",
+                    status=ResponseStatus.INSUFFICIENT_CONTEXT,
+                    reason=ctx_reason,
+                    language=req_lang,
+                    request_id=req_id,
+                    metadata={
+                        "retrieval_count": retrieval_result.retrieval_count,
+                        "retrieval_latency_ms": retrieval_result.retrieval_latency_ms,
+                        "total_latency_ms": round(total_latency_ms, 2),
+                    },
+                )
+
+            _GK_SYSTEM_PROMPT = (
+                "You are a helpful general knowledge assistant. "
+                "Answer the user's question accurately and concisely."
+            )
+            try:
+                gen_kwargs_gk: Dict[str, Any] = {
+                    "question": request.query,
+                    "retrieved_chunks": [],
+                    "max_tokens": self.max_tokens,
+                    "system_prompt": _GK_SYSTEM_PROMPT,
+                }
+                if self.default_model:
+                    gen_kwargs_gk["model_name"] = self.default_model
+
+                raw_gk_result = self.generator_fn(**gen_kwargs_gk)
+            except Exception as e:
+                logger.error(
+                    f"General-knowledge fallback LLM error for query '{request.query}': {e}",
+                    exc_info=True,
+                )
+                t_total_end = time.perf_counter()
+                total_latency_ms = (t_total_end - t_start) * 1000.0
+                return FinalResponse(
+                    answer=ctx_msg or "Available context is insufficient.",
+                    status=ResponseStatus.INSUFFICIENT_CONTEXT,
+                    reason=ctx_reason,
+                    language=req_lang,
+                    request_id=req_id,
+                    metadata={
+                        "retrieval_count": retrieval_result.retrieval_count,
+                        "retrieval_latency_ms": retrieval_result.retrieval_latency_ms,
+                        "total_latency_ms": round(total_latency_ms, 2),
+                    },
+                )
+
+            gk_answer = ""
+            if isinstance(raw_gk_result, dict):
+                gk_answer = (raw_gk_result.get("answer") or "").strip()
+
+            if not gk_answer:
+                t_total_end = time.perf_counter()
+                total_latency_ms = (t_total_end - t_start) * 1000.0
+                return FinalResponse(
+                    answer=ctx_msg or "Available context is insufficient.",
+                    status=ResponseStatus.INSUFFICIENT_CONTEXT,
+                    reason=ctx_reason,
+                    language=req_lang,
+                    request_id=req_id,
+                    metadata={
+                        "retrieval_count": retrieval_result.retrieval_count,
+                        "retrieval_latency_ms": retrieval_result.retrieval_latency_ms,
+                        "total_latency_ms": round(total_latency_ms, 2),
+                    },
+                )
+
             t_total_end = time.perf_counter()
             total_latency_ms = (t_total_end - t_start) * 1000.0
             return FinalResponse(
-                answer=ctx_msg or "Available context is insufficient.",
-                status=ResponseStatus.INSUFFICIENT_CONTEXT,
-                reason=ctx_reason,
+                answer=gk_answer,
+                status=ResponseStatus.SUCCESS,
+                reason="general_knowledge_fallback",
                 language=req_lang,
                 request_id=req_id,
                 metadata={
                     "retrieval_count": retrieval_result.retrieval_count,
                     "retrieval_latency_ms": retrieval_result.retrieval_latency_ms,
+                    "llm_latency_ms": raw_gk_result.get("llm_latency_ms"),
                     "total_latency_ms": round(total_latency_ms, 2),
+                    "model": raw_gk_result.get("model"),
+                    "grounded": False,
+                    "grounding_reason": "general_knowledge_fallback",
+                    "grounding_overlap": 0.0,
+                    "sources": [],
                 },
             )
 
@@ -280,21 +361,107 @@ class RAGHarness:
             logger.warning(
                 f"Grounding guardrail flagged ungrounded output for query '{request.query}': {grounding_res.reason} ({grounding_res.unsupported_claims})"
             )
+
+            if request.require_grounding:
+                # If explicit grounding is required, preserve the refusal
+                return FinalResponse(
+                    answer="The available context does not contain sufficient support to verify this answer.",
+                    status=ResponseStatus.INSUFFICIENT_CONTEXT,
+                    reason="answer_not_grounded",
+                    language=req_lang,
+                    request_id=req_id,
+                    metadata={
+                        "retrieval_count": retrieval_result.retrieval_count,
+                        "retrieval_latency_ms": retrieval_result.retrieval_latency_ms,
+                        "llm_latency_ms": llm_response.latency_ms,
+                        "total_latency_ms": round(total_latency_ms, 2),
+                        "model": llm_response.model,
+                        "grounding_reason": grounding_res.reason,
+                        "grounding_overlap": grounding_res.overlap_score,
+                        "unsupported_claims": grounding_res.unsupported_claims,
+                    },
+                )
+
+            # General-knowledge fallback after grounding failure
+            _GK_SYSTEM_PROMPT_GF = (
+                "You are a helpful general knowledge assistant. "
+                "Answer the user's question accurately and concisely."
+            )
+            try:
+                gen_kwargs_gf: Dict[str, Any] = {
+                    "question": request.query,
+                    "retrieved_chunks": [],
+                    "max_tokens": self.max_tokens,
+                    "system_prompt": _GK_SYSTEM_PROMPT_GF,
+                }
+                if self.default_model:
+                    gen_kwargs_gf["model_name"] = self.default_model
+
+                raw_gf_result = self.generator_fn(**gen_kwargs_gf)
+            except Exception as e:
+                logger.error(
+                    f"General-knowledge fallback LLM error (post-grounding) for query '{request.query}': {e}",
+                    exc_info=True,
+                )
+                return FinalResponse(
+                    answer="The available context does not contain sufficient support to verify this answer.",
+                    status=ResponseStatus.INSUFFICIENT_CONTEXT,
+                    reason="answer_not_grounded",
+                    language=req_lang,
+                    request_id=req_id,
+                    metadata={
+                        "retrieval_count": retrieval_result.retrieval_count,
+                        "retrieval_latency_ms": retrieval_result.retrieval_latency_ms,
+                        "llm_latency_ms": llm_response.latency_ms,
+                        "total_latency_ms": round(total_latency_ms, 2),
+                        "model": llm_response.model,
+                        "grounding_reason": grounding_res.reason,
+                        "grounding_overlap": grounding_res.overlap_score,
+                        "unsupported_claims": grounding_res.unsupported_claims,
+                    },
+                )
+
+            gf_answer = ""
+            if isinstance(raw_gf_result, dict):
+                gf_answer = (raw_gf_result.get("answer") or "").strip()
+
+            if not gf_answer:
+                return FinalResponse(
+                    answer="The available context does not contain sufficient support to verify this answer.",
+                    status=ResponseStatus.INSUFFICIENT_CONTEXT,
+                    reason="answer_not_grounded",
+                    language=req_lang,
+                    request_id=req_id,
+                    metadata={
+                        "retrieval_count": retrieval_result.retrieval_count,
+                        "retrieval_latency_ms": retrieval_result.retrieval_latency_ms,
+                        "llm_latency_ms": llm_response.latency_ms,
+                        "total_latency_ms": round(total_latency_ms, 2),
+                        "model": llm_response.model,
+                        "grounding_reason": grounding_res.reason,
+                        "grounding_overlap": grounding_res.overlap_score,
+                        "unsupported_claims": grounding_res.unsupported_claims,
+                    },
+                )
+
+            t_total_end = time.perf_counter()
+            total_latency_ms = (t_total_end - t_start) * 1000.0
             return FinalResponse(
-                answer="The available context does not contain sufficient support to verify this answer.",
-                status=ResponseStatus.INSUFFICIENT_CONTEXT,
-                reason="answer_not_grounded",
+                answer=gf_answer,
+                status=ResponseStatus.SUCCESS,
+                reason="general_knowledge_fallback",
                 language=req_lang,
                 request_id=req_id,
                 metadata={
                     "retrieval_count": retrieval_result.retrieval_count,
                     "retrieval_latency_ms": retrieval_result.retrieval_latency_ms,
-                    "llm_latency_ms": llm_response.latency_ms,
+                    "llm_latency_ms": raw_gf_result.get("llm_latency_ms"),
                     "total_latency_ms": round(total_latency_ms, 2),
-                    "model": llm_response.model,
-                    "grounding_reason": grounding_res.reason,
-                    "grounding_overlap": grounding_res.overlap_score,
-                    "unsupported_claims": grounding_res.unsupported_claims,
+                    "model": raw_gf_result.get("model"),
+                    "grounded": False,
+                    "grounding_reason": "general_knowledge_fallback",
+                    "grounding_overlap": 0.0,
+                    "sources": [],
                 },
             )
 
@@ -311,6 +478,7 @@ class RAGHarness:
                 "llm_latency_ms": llm_response.latency_ms,
                 "total_latency_ms": round(total_latency_ms, 2),
                 "model": llm_response.model,
+                "grounded": True,
                 "grounding_reason": grounding_res.reason,
                 "grounding_overlap": grounding_res.overlap_score,
                 "sources": [c.to_dict() for c in retrieved_chunks],

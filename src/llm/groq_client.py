@@ -92,6 +92,7 @@ def generate_answer(
     max_tokens: Optional[int] = None,
     api_key: Optional[str] = None,
     client: Optional[Any] = None,
+    system_prompt: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generates a grounded answer to the user's question using retrieved context chunks via Groq.
@@ -103,6 +104,8 @@ def generate_answer(
         max_tokens: Optional max tokens limit for generated completion.
         api_key: Optional API key override.
         client: Optional pre-initialized Groq client (useful for unit testing and mocking).
+        system_prompt: Optional override for the system prompt. When provided,
+            empty retrieved_chunks are permitted (general-knowledge fallback).
 
     Returns:
         Structured dictionary with answer, model, latency, token usage, and preserved retrieved chunks.
@@ -114,19 +117,24 @@ def generate_answer(
     if not clean_question:
         raise ValueError("Question cannot be empty or whitespace-only.")
 
-    # 2. Validate retrieved_chunks
-    if not isinstance(retrieved_chunks, list) or len(retrieved_chunks) == 0:
-        raise ValueError("Retrieved chunks must be a non-empty list of chunk dictionaries.")
+    # 2. Validate retrieved_chunks (skip when using a custom system prompt for general-knowledge fallback)
+    if not system_prompt:
+        if not isinstance(retrieved_chunks, list) or len(retrieved_chunks) == 0:
+            raise ValueError("Retrieved chunks must be a non-empty list of chunk dictionaries.")
 
     # 3. Determine model name
     effective_model = model_name or os.environ.get("GROQ_MODEL") or DEFAULT_GROQ_MODEL
 
     # 4. Format context and construct prompt
-    formatted_context = format_context_chunks(retrieved_chunks)
-    user_prompt = f"CONTEXT:\n{formatted_context}\n\nUSER QUESTION:\n{clean_question}"
+    effective_system = system_prompt or SYSTEM_PROMPT
+    if retrieved_chunks:
+        formatted_context = format_context_chunks(retrieved_chunks)
+        user_prompt = f"CONTEXT:\n{formatted_context}\n\nUSER QUESTION:\n{clean_question}"
+    else:
+        user_prompt = f"USER QUESTION:\n{clean_question}"
 
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": effective_system},
         {"role": "user", "content": user_prompt},
     ]
 

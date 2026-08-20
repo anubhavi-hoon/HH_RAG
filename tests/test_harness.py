@@ -133,7 +133,7 @@ def test_harness_hindi_safety_guardrail_refusal(mock_retriever, mock_generator):
 
 
 def test_harness_context_sufficiency_guardrail(mock_generator):
-    """Test that low-similarity / irrelevant retrieval triggers insufficient context and stops BEFORE Groq."""
+    """Test that low-similarity / irrelevant retrieval triggers general-knowledge fallback via LLM."""
     low_scoring_retriever = MagicMock()
     low_scoring_retriever.return_value = [
         {"chunk_id": "c1", "text": "unrelated content", "score": 0.22},
@@ -153,14 +153,16 @@ def test_harness_context_sufficiency_guardrail(mock_generator):
 
     response = harness.run(req)
 
-    assert response.status == ResponseStatus.INSUFFICIENT_CONTEXT
-    assert response.reason == "insufficient_context"
-    assert "insufficient" in response.answer.lower()
+    assert response.status == ResponseStatus.SUCCESS
+    assert response.reason == "general_knowledge_fallback"
     assert response.request_id == "req_offtopic"
 
-    # Verify retrieval was called once, but Groq generator was NOT called
+    # Verify retrieval was called once, and the generator was called for the fallback
     low_scoring_retriever.assert_called_once()
-    mock_generator.assert_not_called()
+    mock_generator.assert_called_once()
+    # The fallback call should include a system_prompt kwarg
+    call_kwargs = mock_generator.call_args
+    assert call_kwargs.kwargs.get("system_prompt") or (len(call_kwargs.args) > 6 and call_kwargs.args[6])
 
 
 def test_harness_retrieval_exception_recovery(mock_generator):
@@ -304,10 +306,11 @@ def test_harness_grounding_failure_intercepts_hallucination(sample_raw_chunks):
 
     response = harness.run(req)
 
-    assert response.status == ResponseStatus.INSUFFICIENT_CONTEXT
-    assert response.reason == "answer_not_grounded"
-    assert "support" in response.answer.lower()
+    assert response.status == ResponseStatus.SUCCESS
+    assert response.reason == "general_knowledge_fallback"
     assert response.request_id == "req_hallucinated"
     assert response.metadata is not None
-    assert response.metadata["grounding_reason"] in ("numerical_mismatch", "unsupported_entity", "unsupported_content")
+    assert response.metadata["grounding_reason"] == "general_knowledge_fallback"
+    # Generator called twice: once for strict RAG (caught by grounding), once for fallback
+    assert hallucinating_generator.call_count == 2
 

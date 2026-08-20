@@ -66,6 +66,7 @@ class QueryRequest(BaseModel):
     """Text query submitted to /api/query."""
 
     query: str = Field(min_length=1, max_length=2000)
+    require_grounding: bool = False
 
     @field_validator("query")
     @classmethod

@@ -224,7 +224,8 @@ def transcribe_audio(filename: str, audio_bytes: bytes) -> str:
 class MockRAGService(RAGService):
     """Deterministic stand-in for the real retrieval + generation pipeline."""
 
-    def query(self, query: str) -> RagResponse:
+    def query(self, query: str, require_grounding: bool = False) -> RagResponse:
+        """Simulate a RAG pipeline based on deterministic test patterns."""
         if not query or not query.strip():
             raise InvalidQueryError("Query must not be empty.")
         return answer_query(query)

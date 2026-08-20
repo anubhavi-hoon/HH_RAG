@@ -177,16 +177,23 @@ def test_scenario_7_insufficient_context():
         {"chunk_id": "c_low", "text": "Unrelated topic", "score": 0.28, "language": "en"}
     ]
     retriever = MagicMock(return_value=low_score_chunks)
-    generator = MagicMock()
+    generator = MagicMock(return_value={
+        "answer": "General knowledge answer about basketball.",
+        "model": "llama-3.1-8b-instant",
+        "llm_latency_ms": 200.0,
+    })
     harness = RAGHarness(retriever_fn=retriever, generator_fn=generator, min_similarity_threshold=0.35)
 
     req = QueryRequest(query="Who won the 2024 basketball championship?", language="en", request_id="req_low")
     resp = harness.run(req)
 
-    assert resp.status == ResponseStatus.INSUFFICIENT_CONTEXT
-    assert resp.reason == "insufficient_context"
+    assert resp.status == ResponseStatus.SUCCESS
+    assert resp.reason == "general_knowledge_fallback"
     retriever.assert_called_once()
-    generator.assert_not_called()
+    generator.assert_called_once()
+    # The fallback call should include a system_prompt kwarg
+    call_kwargs = generator.call_args
+    assert "system_prompt" in call_kwargs.kwargs
 
 
 # ------------------------------------------------------------------------------
@@ -224,11 +231,11 @@ def test_scenario_9_hallucinated_answer(valid_english_chunks):
     req = QueryRequest(query="Who invented the Turing machine?", language="en")
     resp = harness.run(req)
 
-    # Hallucinated answer is rejected and mapped to INSUFFICIENT_CONTEXT
-    assert resp.status == ResponseStatus.INSUFFICIENT_CONTEXT
-    assert resp.reason == "answer_not_grounded"
-    # Groq was called exactly once, no retry or secondary LLM call
-    generator.assert_called_once()
+    # Hallucinated answer is caught by grounding, then general-knowledge fallback fires
+    assert resp.status == ResponseStatus.SUCCESS
+    assert resp.reason == "general_knowledge_fallback"
+    # Groq was called twice: once for strict RAG (rejected by grounding), once for fallback
+    assert generator.call_count == 2
 
 
 # ------------------------------------------------------------------------------

@@ -91,7 +91,7 @@ class RAGService(ABC):
     """Contract every RAG implementation (mock or real) must satisfy."""
 
     @abstractmethod
-    def query(self, query: str) -> RagResponse:
+    def query(self, query: str, require_grounding: bool = False) -> RagResponse:
         """Answer a text question.
 
         Raises:
