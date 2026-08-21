@@ -140,6 +140,44 @@ def test_real_rag_service_error_response_mapping():
     assert resp.confidence == 0.0
 
 
+def test_real_rag_service_greeting_mapping():
+    """Test mapping of greeting FinalResponse to RagResponse."""
+    harness = MagicMock()
+    harness.run.return_value = FinalResponse(
+        answer="Hello! I am Vaani (वाणी), your AI assistant.",
+        status=ResponseStatus.SUCCESS,
+        reason="conversational_greeting",
+        language="en",
+        metadata={"is_greeting": True, "grounded": True, "sources": []},
+    )
+    service = RealRAGService(harness=harness)
+    resp = service.query("hello")
+
+    assert resp.grounded is True
+    assert resp.confidence == 1.0
+    assert resp.sources == []
+    assert "Vaani" in resp.answer
+
+
+def test_real_rag_service_general_knowledge_fallback_mapping():
+    """Test mapping of general knowledge fallback response."""
+    harness = MagicMock()
+    harness.run.return_value = FinalResponse(
+        answer="Climate change is primarily caused by greenhouse gas emissions.",
+        status=ResponseStatus.SUCCESS,
+        reason="general_knowledge_fallback",
+        language="en",
+        metadata={"grounded": False, "sources": []},
+    )
+    service = RealRAGService(harness=harness)
+    resp = service.query("What causes climate change?")
+
+    assert resp.grounded is False
+    assert resp.confidence == 0.70
+    assert resp.sources == []
+
+
+
 def test_real_rag_service_empty_query_raises():
     """Test empty/whitespace queries raise InvalidQueryError immediately."""
     service = RealRAGService(harness=MagicMock())

@@ -79,16 +79,26 @@ class RealRAGService(RAGService):
 
         # 3. Map FinalResponse to API RagResponse schema
         meta = final_response.metadata or {}
-        is_grounded = meta.get("grounded", final_response.status == ResponseStatus.SUCCESS)
+        is_greeting = bool(meta.get("is_greeting", False))
+        is_fallback = final_response.reason == "general_knowledge_fallback"
+        is_grounded = meta.get("grounded", final_response.status == ResponseStatus.SUCCESS and not is_fallback)
 
-        # Deterministic confidence mapping
-        if is_grounded:
-            confidence = 0.95
+        # Confidence mapping
+        if is_greeting:
+            confidence = 1.0
+        elif is_grounded:
+            raw_sources = meta.get("sources", [])
+            if raw_sources:
+                top_score = max(float(s.get("score", 0.0)) for s in raw_sources)
+                confidence = round(min(0.98, max(0.75, 0.70 + (top_score - 0.35) * 0.45)), 2)
+            else:
+                confidence = 0.95
+        elif is_fallback:
+            confidence = 0.70
         else:
             confidence = 0.0
 
         # Sub-stage latency extraction from harness metadata
-        meta = final_response.metadata or {}
         latency_metrics = LatencyMetrics(
             stt_ms=0.0,
             embedding_ms=0.0,
@@ -98,9 +108,9 @@ class RealRAGService(RAGService):
             total_ms=0.0,  # Populated by route Timer
         )
 
-        # Extract sources from harness metadata
+        # Extract sources from harness metadata (only for grounded responses with valid passages)
         api_sources = []
-        if is_grounded:
+        if is_grounded and not is_greeting:
             raw_sources = meta.get("sources", [])
             for s in raw_sources:
                 s_meta = s.get("metadata") or {}

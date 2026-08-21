@@ -97,3 +97,38 @@ def test_context_sufficiency_guardrail():
     assert is_suff is True
     assert reason is None
     assert msg is None
+
+
+def test_greeting_guardrail():
+    """Test greeting guardrail detects conversational greetings in English and Hindi."""
+    from src.orchestration.guardrails import greeting_guardrail
+
+    # English greetings
+    en_greetings = ["hello", "Hello!", "hi", "hey", "good morning", "who are you?", "what is vaani"]
+    for g in en_greetings:
+        is_greeting, reason, resp = greeting_guardrail(g, language="en")
+        assert is_greeting is True, f"Expected greeting for '{g}'"
+        assert reason == "conversational_greeting"
+        assert "Vaani" in resp
+
+    # Hindi greetings
+    hi_greetings = ["नमस्ते", "नमस्कार", "प्रणाम", "हाय", "आप कौन हैं?"]
+    for g in hi_greetings:
+        is_greeting, reason, resp = greeting_guardrail(g, language="hi")
+        assert is_greeting is True, f"Expected greeting for '{g}'"
+        assert reason == "conversational_greeting"
+        assert "वाणी" in resp
+
+    # Factual non-greetings
+    factual_queries = [
+        "What is photosynthesis?",
+        "What are the primary causes of climate change?",
+        "what direction does phloem flow",
+        "मैनहट्टन परियोजना क्या थी?",
+    ]
+    for q in factual_queries:
+        is_greeting, reason, resp = greeting_guardrail(q)
+        assert is_greeting is False, f"Expected non-greeting for '{q}'"
+        assert reason is None
+        assert resp is None
+

@@ -111,15 +111,35 @@ class RAGService(ABC):
 @lru_cache(maxsize=1)
 def get_rag_service() -> RAGService:
     """Provide the active implementation. Routes inject this via ``Depends``."""
+    import logging
     import os
+    from pathlib import Path
+    from dotenv import load_dotenv
 
-    use_real = os.getenv("HH_RAG_USE_REAL", "false").lower() in ("1", "true", "yes")
-    use_mock = os.getenv("HH_RAG_USE_MOCK", "true" if not use_real else "false").lower() in ("1", "true", "yes")
+    load_dotenv()
+    _log = logging.getLogger("rag_service")
 
-    if not use_mock or use_real:
+    index_exists = Path("data/embeddings/embeddings.faiss").exists()
+    
+    # Check explicit environment variables
+    env_use_real = os.getenv("HH_RAG_USE_REAL")
+    env_use_mock = os.getenv("HH_RAG_USE_MOCK")
+
+    if env_use_real is not None:
+        use_real = env_use_real.lower() in ("1", "true", "yes")
+    elif env_use_mock is not None:
+        use_real = env_use_mock.lower() not in ("1", "true", "yes")
+    else:
+        # Default: Use RealRAGService if index exists on disk, otherwise MockRAGService
+        use_real = index_exists
+
+    if use_real:
+        _log.info("Activated RealRAGService with live vector retrieval & Stage 5 harness.")
         from src.services.real_rag import RealRAGService
         return RealRAGService()
 
+    _log.info("Activated MockRAGService with deterministic canned responses.")
     from src.services.mock_rag import MockRAGService
     return MockRAGService()
+
 

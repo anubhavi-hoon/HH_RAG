@@ -5,6 +5,10 @@ Run locally with:
 """
 
 import logging
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +27,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+_log = logging.getLogger("hh_rag.main")
+_log.info("Starting HH_RAG service. SARVAM_API_KEY configured: %s", bool(os.getenv("SARVAM_API_KEY")))
+
 
 app = FastAPI(
     title="HH_RAG API",

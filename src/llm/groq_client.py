@@ -139,6 +139,24 @@ def generate_answer(
     ]
 
     # 5. Initialize client
+    if client is None and not (api_key or os.environ.get("GROQ_API_KEY")):
+        if retrieved_chunks:
+            top_text = (retrieved_chunks[0].get("text") or "").strip()
+            return {
+                "answer": top_text,
+                "model": "extractive-local",
+                "llm_latency_ms": 0.5,
+                "tokens_used": len(top_text.split()),
+                "retrieved_chunks": retrieved_chunks,
+            }
+        return {
+            "answer": "The available knowledge context is insufficient to answer this query, and GROQ_API_KEY is not configured for general knowledge synthesis.",
+            "model": "fallback-local",
+            "llm_latency_ms": 0.5,
+            "tokens_used": 0,
+            "retrieved_chunks": [],
+        }
+
     groq_client = client or get_groq_client(api_key=api_key)
 
     # 6. Call Groq API measuring latency
