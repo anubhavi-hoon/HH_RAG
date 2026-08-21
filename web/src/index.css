@@ -26,50 +26,49 @@ body {
   color: #ffffff;
 }
 
-/* Monochromatic subtle animations */
+/* Calm Monochromatic animations */
 @keyframes orbBreathing {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 0 50px -10px rgba(255, 255, 255, 0.04), 0 0 100px -20px rgba(255, 255, 255, 0.02);
+    box-shadow: 0 0 40px -10px rgba(255, 255, 255, 0.03);
   }
   50% {
     transform: scale(1.02);
-    box-shadow: 0 0 70px -5px rgba(255, 255, 255, 0.08), 0 0 130px -15px rgba(255, 255, 255, 0.04);
+    box-shadow: 0 0 60px -5px rgba(255, 255, 255, 0.07);
   }
 }
 
-@keyframes waveBarMono {
+@keyframes pulseGently {
   0%, 100% {
-    height: 6px;
-    opacity: 0.4;
+    transform: scale(1);
+    opacity: 0.8;
   }
   50% {
-    height: 28px;
-    opacity: 0.9;
+    transform: scale(1.04);
+    opacity: 1;
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.12);
   }
 }
 
-@keyframes rippleMono {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.4;
+@keyframes rotateSlow {
+  from {
+    transform: rotate(0deg);
   }
-  50% {
-    transform: scale(1.15);
-    opacity: 0.15;
-  }
-  100% {
-    transform: scale(1.4);
-    opacity: 0;
+  to {
+    transform: rotate(360deg);
   }
 }
 
-.animate-orb-mono {
-  animation: orbBreathing 5s ease-in-out infinite;
+.animate-orb-breathe {
+  animation: orbBreathing 6s ease-in-out infinite;
 }
 
-.animate-ripple-mono {
-  animation: rippleMono 4s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+.animate-pulse-gently {
+  animation: pulseGently 2.5s ease-in-out infinite;
+}
+
+.animate-rotate-slow {
+  animation: rotateSlow 20s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -81,3 +80,5 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+
