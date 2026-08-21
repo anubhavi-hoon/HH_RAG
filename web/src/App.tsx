@@ -193,6 +193,7 @@ export default function App() {
                 grounded={result.response.grounded}
                 confidence={result.response.confidence}
                 language={result.response.language}
+                sources={result.response.sources}
               />
               <SourcesPanel sources={result.response.sources} />
               <LatencyMetricsPanel

@@ -28,8 +28,7 @@ export function SourcesPanel({ sources }: SourcesPanelProps) {
     >
       {sources.length === 0 ? (
         <EmptyState>
-          No sources were retrieved for this answer. The response is ungrounded and
-          should not be treated as factual.
+          No sources were retrieved for this answer.
         </EmptyState>
       ) : (
         <ol className="space-y-3">
