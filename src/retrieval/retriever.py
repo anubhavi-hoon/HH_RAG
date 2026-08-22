@@ -18,6 +18,8 @@ from typing import Any, Dict, List, Optional
 import faiss
 faiss.omp_set_num_threads(1)
 import numpy as np
+import torch
+torch.set_num_threads(int(os.getenv("TORCH_NUM_THREADS", "1")))
 
 from sentence_transformers import SentenceTransformer
 

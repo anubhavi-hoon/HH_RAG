@@ -79,7 +79,8 @@ def get_groq_client(api_key: Optional[str] = None) -> groq.Groq:
         )
     clean_key = key.strip()
     if _GROQ_CLIENT is None or _CACHED_API_KEY != clean_key:
-        _GROQ_CLIENT = groq.Groq(api_key=clean_key)
+        timeout_sec = float(os.getenv("GROQ_TIMEOUT_SECONDS", "30.0"))
+        _GROQ_CLIENT = groq.Groq(api_key=clean_key, timeout=timeout_sec)
         _CACHED_API_KEY = clean_key
     return _GROQ_CLIENT
 

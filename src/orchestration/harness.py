@@ -164,6 +164,7 @@ class RAGHarness:
             )
 
         # 4. Retrieval Stage
+        logger.info("Starting retrieval for query '%s' (top_k=%d)...", request.query, self.top_k)
         t_ret_start = time.perf_counter()
         try:
             raw_chunks = self.retriever_fn(request.query, self.top_k)
@@ -178,6 +179,7 @@ class RAGHarness:
             )
         t_ret_end = time.perf_counter()
         ret_latency_ms = (t_ret_end - t_ret_start) * 1000.0
+        logger.info("Retrieval completed in %.2fms (%d chunks retrieved)", ret_latency_ms, len(raw_chunks))
 
         # 5. Convert to RetrievalResult & RetrievedChunk models
         retrieved_chunks: List[RetrievedChunk] = []
@@ -330,6 +332,7 @@ class RAGHarness:
             if self.default_model:
                 gen_kwargs["model_name"] = self.default_model
 
+            logger.info("Starting LLM generation for query '%s'...", request.query)
             raw_llm_result = self.generator_fn(**gen_kwargs)
         except Exception as e:
             logger.error(f"LLM generation error for query '{request.query}': {e}", exc_info=True)
@@ -370,6 +373,7 @@ class RAGHarness:
             model=raw_llm_result.get("model"),
             latency_ms=raw_llm_result.get("llm_latency_ms"),
         )
+        logger.info("LLM generation completed in %.2fms (model=%s)", llm_response.latency_ms or 0.0, llm_response.model)
 
         # 7. Output Grounding Guardrail (Strategy A: Lexical & Numerical Verification)
         grounding_res = self.grounding_fn(
