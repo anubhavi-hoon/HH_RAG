@@ -19,9 +19,11 @@ __pycache__/
 # Data files (raw and processed data)
 data/processed/
 data/raw/
-data/embeddings/
 *.parquet
 *.jsonl
+data/embeddings/*
+!data/embeddings/embeddings.faiss
+!data/embeddings/embedding_metadata.jsonl
 
 
 # Testing & Coverage
