@@ -1,25 +1,74 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "Inter", "Noto Sans Devanagari", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-devanagari: "Noto Sans Devanagari", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 html {
   color-scheme: dark;
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
-  background-color: #08090a;
-  color: #e4e4e7;
+  background-color: #030405;
+  color: #f5f5f5;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
 ::selection {
-  background-color: #27272a;
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+/* Calm Monochromatic animations */
+@keyframes orbBreathing {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 40px -10px rgba(255, 255, 255, 0.03);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 60px -5px rgba(255, 255, 255, 0.07);
+  }
+}
+
+@keyframes pulseGently {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.12);
+  }
+}
+
+@keyframes rotateSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-orb-breathe {
+  animation: orbBreathing 6s ease-in-out infinite;
+}
+
+.animate-pulse-gently {
+  animation: pulseGently 2.5s ease-in-out infinite;
+}
+
+.animate-rotate-slow {
+  animation: rotateSlow 20s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -31,3 +80,5 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+

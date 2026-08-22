@@ -11,8 +11,12 @@ import os
 import time
 from dataclasses import dataclass
 from typing import Any, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from src.services.rag_service import AudioInvalidError, SttFailedError
+
 
 logger = logging.getLogger("sarvam_stt")
 

@@ -103,3 +103,38 @@ def context_sufficiency_guardrail(
         )
 
     return True, None, None
+
+
+# Deterministic greeting patterns for conversational queries
+GREETING_PATTERNS_EN = re.compile(
+    r"^\s*(hello|hi|hey|hi there|hello there|good morning|good afternoon|good evening|who are you|what is vaani|what can you do|how are you|how are you doing|help)[!\?.\s]*$",
+    re.IGNORECASE,
+)
+
+GREETING_PATTERNS_HI = re.compile(
+    r"^\s*(नमस्ते|नमस्कार|प्रणाम|सुप्रभात|शुभ संध्या|हाय|हैलो|हेलो|आप कौन हैं|वाणी क्या है|तुम कौन हो|आप क्या कर सकते हैं|आप क्या कर सकती हैं|कैसे हो|कैसी हो|मदद)[!\?.\s]*$",
+    re.IGNORECASE,
+)
+
+
+GREETING_RESPONSES = {
+    "en": "Hello! I am Vaani (वाणी), your voice-enabled multilingual AI knowledge assistant. How can I help you today?",
+    "hi": "नमस्ते! मैं वाणी (Vaani) हूँ, आपकी बहुभाषी AI ज्ञान सहायक। आज मैं आपकी क्या सहायता कर सकती हूँ?",
+}
+
+
+def greeting_guardrail(query: str, language: Optional[str] = None) -> Tuple[bool, Optional[str], Optional[str]]:
+    """
+    Detects if the query is a conversational greeting rather than a factual knowledge question.
+
+    Returns:
+        (is_greeting, greeting_reason, greeting_response)
+    """
+    cleaned = query.strip()
+    if GREETING_PATTERNS_HI.search(cleaned):
+        return True, "conversational_greeting", GREETING_RESPONSES["hi"]
+    if GREETING_PATTERNS_EN.search(cleaned):
+        lang_key = "hi" if language == "hi" else "en"
+        return True, "conversational_greeting", GREETING_RESPONSES[lang_key]
+    return False, None, None
+

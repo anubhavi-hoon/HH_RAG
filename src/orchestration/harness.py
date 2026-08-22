@@ -15,6 +15,7 @@ from src.orchestration.grounding import GroundingResult, verify_grounding
 from src.orchestration.guardrails import (
     DEFAULT_SIMILARITY_THRESHOLD,
     context_sufficiency_guardrail,
+    greeting_guardrail,
     safety_guardrail,
     validate_input_guardrail,
 )
@@ -136,6 +137,30 @@ class RAGHarness:
                 reason=refusal_reason,
                 language=req_lang,
                 request_id=req_id,
+            )
+
+        # 3.5. Conversational Greeting Guardrail
+        is_greeting, greeting_reason, greeting_msg = greeting_guardrail(request.query, language=req_lang)
+        if is_greeting:
+            t_total_end = time.perf_counter()
+            total_latency_ms = (t_total_end - t_start) * 1000.0
+            return FinalResponse(
+                answer=greeting_msg or "Hello! How can I help you?",
+                status=ResponseStatus.SUCCESS,
+                reason=greeting_reason,
+                language=req_lang,
+                request_id=req_id,
+                metadata={
+                    "is_greeting": True,
+                    "grounded": True,
+                    "grounding_reason": "conversational_greeting",
+                    "grounding_overlap": 1.0,
+                    "retrieval_count": 0,
+                    "retrieval_latency_ms": 0.0,
+                    "llm_latency_ms": 0.0,
+                    "total_latency_ms": round(total_latency_ms, 2),
+                    "sources": [],
+                },
             )
 
         # 4. Retrieval Stage
